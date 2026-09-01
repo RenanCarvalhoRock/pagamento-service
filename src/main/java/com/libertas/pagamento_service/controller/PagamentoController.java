@@ -32,19 +32,15 @@ public class PagamentoController {
         // Lógica para processar o pagamento
         String url = pedidoServiceUrl + "/pedidos/{id}/atualizar-pedido";
         Map<String, String> requestBody = Map.of("status", "PAGO");
-
-        log.info("Chamando pedido-service -> PUT {} | body={}", url.replace("{id}", id), requestBody);
-
         try {
-            ResponseEntity<String> response = restTemplate.exchange(
-                    url, HttpMethod.PUT, new HttpEntity<>(requestBody), String.class, id);
-
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.PUT, new HttpEntity<>(requestBody), String.class, id);
             log.info("Resposta do pedido-service -> status={} | body={}", response.getStatusCode(), response.getBody());
+            return ResponseEntity.ok(Map.of("message", "Pagamento processado com sucesso!"));
         } catch (RestClientException e) {
-            log.error("Falha ao chamar pedido-service: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
-                    .body(Map.of("message", "Falha ao atualizar status do pedido", "erro", e.getMessage()));
+            log.error("Erro ao atualizar o status do pedido: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Erro ao atualizar o status do pedido."));
         }
-        return ResponseEntity.ok(Map.of("message", "Pagamento processado com sucesso!"));
     }
+
 }
