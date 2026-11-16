@@ -2,7 +2,9 @@ package com.libertas.pagamento_service.config;
 
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
+import org.springframework.amqp.core.DirectExchange;
 import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueBuilder;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -15,6 +17,8 @@ public class RabbitMQConfig {
     public static final String PEDIDOS_EXCHANGE = "pedidos";
     public static final String ROUTING_KEY_PEDIDO_CRIADO = "pedido.criado";
     public static final String PEDIDO_CRIADO_QUEUE = "pagamento.pedido.criado";
+    public static final String PEDIDOS_DLX = "pedidos.dlx";
+    public static final String PEDIDO_CRIADO_DLQ = "pagamento.pedido.criado.dlq";
 
     // Mesma definição da exchange declarada pelo pedido-service (declaração é idempotente)
     @Bean
@@ -22,14 +26,33 @@ public class RabbitMQConfig {
         return new TopicExchange(PEDIDOS_EXCHANGE, true, false);
     }
 
+    // Mensagens rejeitadas (após esgotar os retries) são encaminhadas para a DLX -> DLQ
     @Bean
     public Queue pedidoCriadoQueue() {
-        return new Queue(PEDIDO_CRIADO_QUEUE, true);
+        return QueueBuilder.durable(PEDIDO_CRIADO_QUEUE)
+                .deadLetterExchange(PEDIDOS_DLX)
+                .deadLetterRoutingKey(PEDIDO_CRIADO_DLQ)
+                .build();
     }
 
     @Bean
     public Binding pedidoCriadoBinding(Queue pedidoCriadoQueue, TopicExchange pedidosExchange) {
         return BindingBuilder.bind(pedidoCriadoQueue).to(pedidosExchange).with(ROUTING_KEY_PEDIDO_CRIADO);
+    }
+
+    @Bean
+    public DirectExchange pedidosDlx() {
+        return new DirectExchange(PEDIDOS_DLX, true, false);
+    }
+
+    @Bean
+    public Queue pedidoCriadoDlq() {
+        return QueueBuilder.durable(PEDIDO_CRIADO_DLQ).build();
+    }
+
+    @Bean
+    public Binding pedidoCriadoDlqBinding(Queue pedidoCriadoDlq, DirectExchange pedidosDlx) {
+        return BindingBuilder.bind(pedidoCriadoDlq).to(pedidosDlx).with(PEDIDO_CRIADO_DLQ);
     }
 
     // Converte o JSON da mensagem para o tipo do parâmetro do @RabbitListener,
